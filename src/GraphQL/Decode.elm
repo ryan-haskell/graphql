@@ -1,5 +1,6 @@
 module GraphQL.Decode exposing
     ( Decoder
+    , test
     , string, float, int, bool, id
     , scalar
     , enum
@@ -7,12 +8,20 @@ module GraphQL.Decode exposing
     , maybe, list
     , union, interface
     , Variant, variant
-    , test, toJsonDecoder
     )
 
 {-|
 
 @docs Decoder
+
+
+## **Learning and troubleshooting**
+
+When I first got started with JSON decoders, I had a hard time visualizing what was going on.
+For that reason, this module comes with a [`test`](#test) function to help you
+easily verify your code is behaving the way you expect.
+
+@docs test
 
 
 ## **Scalars**
@@ -101,13 +110,9 @@ This will allow your Elm frontend to know which types came back:
 @docs union, interface
 @docs Variant, variant
 
-
-## **Testing decoders**
-
-@docs test, toJsonDecoder
-
 -}
 
+import GraphQL.Internals.Decoder exposing (Decoder(..))
 import GraphQL.Scalar.Id exposing (Id)
 import GraphQL.Value exposing (Value)
 import Json.Decode
@@ -133,10 +138,8 @@ import Json.Decode
 This `Decoder` type represents a value that knows how to convert a raw JSON response into standard Elm values that can be used in your Elm application.
 
 -}
-type Decoder value
-    = Decoder
-        { decoder : Json.Decode.Decoder value
-        }
+type alias Decoder value =
+    GraphQL.Internals.Decoder.Decoder value
 
 
 
@@ -652,7 +655,21 @@ variant options =
         )
 
 
-{-| The `elm/json` package comes with [`decodeString`](https://package.elm-lang.org/packages/elm/json/latest/Json-Decode#decodeString)
+{-| The `elm/json` package comes with [`decodeString`](https://package.elm-lang.org/packages/elm/json/latest/Json-Decode#decodeString), which is great for testing
+JSON decoders when learning them for the first time, or using them with in an `elm-test` suite.
+
+This function is exposed so you can quickly check if your GraphQL `Decoder` works as you expect on
+a raw JSON string.
+
+    import GraphQL.Decode
+
+    testResult : Result Http.Error Int
+    testResult =
+        GraphQL.Decode.test
+            { decoder = GraphQL.Decode.int
+            , json = """ 1000 """"
+            }
+
 -}
 test :
     { decoder : Decoder value
@@ -661,11 +678,5 @@ test :
     -> Result Json.Decode.Error value
 test options =
     Json.Decode.decodeString
-        (toJsonDecoder options.decoder)
+        (GraphQL.Internals.Decoder.toJsonDecoder options.decoder)
         options.json
-
-
-{-| -}
-toJsonDecoder : Decoder value -> Json.Decode.Decoder value
-toJsonDecoder (Decoder { decoder }) =
-    decoder

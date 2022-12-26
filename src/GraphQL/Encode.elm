@@ -1,9 +1,10 @@
 module GraphQL.Encode exposing
     ( Value
-    , string, float, int, boolean, id
+    , string, float, int, bool, id
     , scalar
     , enum
     , input
+    , null
     )
 
 {-|
@@ -13,7 +14,7 @@ module GraphQL.Encode exposing
 
 ## **Scalars**
 
-@docs string, float, int, boolean, id
+@docs string, float, int, bool, id
 @docs scalar
 
 
@@ -25,6 +26,7 @@ module GraphQL.Encode exposing
 ## **Input types**
 
 @docs input
+@docs null
 
 -}
 
@@ -33,22 +35,40 @@ import GraphQL.Value
 import Json.Encode
 
 
-{-| The `Value` type represents a JSON value that can be sent to your GraphQL API as a variable.
+{-| The `Value` type represents a JSON value that will be sent to your GraphQL API.
+When you use this with the [`GraphQL.Http`](./GraphQL-Http) module, this is an example
+of what will be sent with your HTTP request:
+
+```json
+{
+    "variables": {
+        "id": "123",
+        "form": {
+            "email": "ryan@elm.land",
+            "password": "secret123"
+        }
+    }
+}
+```
+
 -}
 type alias Value =
     GraphQL.Value.Value
 
 
-{-| -}
-id : Id -> Value
-id value =
-    value
-        |> GraphQL.Scalar.Id.toString
-        |> Json.Encode.string
-        |> GraphQL.Value.fromJson
+
+-- SCALAR TYPES
 
 
-{-| -}
+{-| Create a GraphQL input from a `String` value:
+
+    import GraphQL.Encode
+
+    name : GraphQL.Encode.Value
+    name =
+        GraphQL.Encode.string "Ryan"
+
+-}
 string : String -> Value
 string value =
     value
@@ -56,7 +76,15 @@ string value =
         |> GraphQL.Value.fromJson
 
 
-{-| -}
+{-| Create a GraphQL input from a `Float` value:
+
+    import GraphQL.Encode
+
+    score : GraphQL.Encode.Value
+    score =
+        GraphQL.Encode.float 0.99
+
+-}
 float : Float -> Value
 float value =
     value
@@ -64,7 +92,15 @@ float value =
         |> GraphQL.Value.fromJson
 
 
-{-| -}
+{-| Create a GraphQL input from a `Int` value:
+
+    import GraphQL.Encode
+
+    age : GraphQL.Encode.Value
+    age =
+        GraphQL.Encode.int 62
+
+-}
 int : Int -> Value
 int value =
     value
@@ -72,11 +108,41 @@ int value =
         |> GraphQL.Value.fromJson
 
 
-{-| -}
-boolean : Bool -> Value
-boolean value =
+{-| Create a GraphQL input from a `Bool` value:
+
+    import GraphQL.Encode
+
+    isReadingThis : GraphQL.Encode.Value
+    isReadingThis =
+        GraphQL.Encode.bool True
+
+-}
+bool : Bool -> Value
+bool value =
     value
         |> Json.Encode.bool
+        |> GraphQL.Value.fromJson
+
+
+{-| Create a GraphQL input from a `Id` value:
+
+    import GraphQL.Encode
+    import GraphQL.Scalar.Id exposing (Id)
+
+    userId : Id
+    userId =
+        GraphQL.Scalar.Id.fromInt 1203
+
+    isReadingThis : GraphQL.Encode.Value
+    isReadingThis =
+        GraphQL.Encode.id userId
+
+-}
+id : Id -> Value
+id value =
+    value
+        |> GraphQL.Scalar.Id.toString
+        |> Json.Encode.string
         |> GraphQL.Value.fromJson
 
 
@@ -124,7 +190,48 @@ scalar options =
         |> GraphQL.Value.fromJson
 
 
-{-| -}
+
+-- ENUMERATION TYPES
+
+
+{-| Create a GraphQL input from an enum value. To avoid duplicating code, we recommend
+you create a separate Elm module per enum, like `GraphQL.Enum.Episode`.
+
+In that module, you can define your `encode` function in one place:
+
+    -- module GraphQL.Enum.Episode exposing
+    --     ( Episode(..), list
+    --     , decoder, encode
+    --     )
+
+
+    import GraphQL.Encode
+
+    type Episode
+        = NewHope
+        | EmpireStrikesBack
+        | ReturnOfTheJedi
+
+    encode : Episode -> GraphQL.Encode.Value
+    encode episode =
+        GraphQL.Encode.enum
+            { toString = toString
+            , value = episode
+            }
+
+    toString : Episode -> String
+    toString episode =
+        case episode of
+            NewHope ->
+                "NEWHOPE"
+
+            EmpireStrikesBack ->
+                "EMPIRE"
+
+            ReturnOfTheJedi ->
+                "RETURN"
+
+-}
 enum :
     { toString : enum -> String
     , value : enum
@@ -137,7 +244,27 @@ enum options =
         |> GraphQL.Value.fromJson
 
 
-{-| -}
+
+-- INPUT TYPES
+
+
+{-| GraphQL allows the API to define [input types](https://graphql.org/learn/schema/#input-types). These allow you to group
+your inputs into an object, like this:
+
+    import GraphQL.Encode
+
+    reviewInputValue : GraphQL.Encode.Value
+    reviewInputValue =
+        GraphQL.Encode.input
+            [ ( "stars"
+              , GraphQL.Encode.int 10
+              )
+            , ( "commentary"
+              , GraphQL.Encode.int "Would eat again!"
+              )
+            ]
+
+-}
 input : List ( String, Value ) -> Value
 input fields =
     let
@@ -150,3 +277,25 @@ input fields =
     Json.Encode.object
         (List.map toJsonField fields)
         |> GraphQL.Value.fromJson
+
+
+{-| Send a `null` value to a GraphQL API. This is commonly used by mutations
+to mark a field as removed.
+
+    import GraphQL.Encode
+
+    profileInputValue : GraphQL.Encode.Value
+    profileInputValue =
+        GraphQL.Encode.input
+            [ ( "name"
+              , GraphQL.Encode.string "Ryan"
+              )
+            , ( "bio"
+              , GraphQL.Encode.null
+              )
+            ]
+
+-}
+null : Value
+null =
+    GraphQL.Value.fromJson Json.Encode.null

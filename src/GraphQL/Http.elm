@@ -53,6 +53,7 @@ Use these if you need to send HTTP headers, define request timeouts, etc.
 
 import GraphQL.Decode
 import GraphQL.Encode
+import GraphQL.Internals.Decoder
 import GraphQL.Value
 import Http
 import Json.Decode
@@ -222,7 +223,7 @@ expect onResponse decoder =
     Http.expectJson
         onResponse
         (Json.Decode.field "data"
-            (GraphQL.Decode.toJsonDecoder decoder)
+            (GraphQL.Internals.Decoder.toJsonDecoder decoder)
         )
 
 
