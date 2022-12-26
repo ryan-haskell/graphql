@@ -44,7 +44,7 @@ type Msg
 
 findHero : String -> Cmd Msg
 findHero heroId =
-    Http.get
+    GraphQL.Http.get
         { url = "/graphql"
         , query = """
             query FindHero($id: Id!) {
