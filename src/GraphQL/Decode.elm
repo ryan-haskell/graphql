@@ -8,6 +8,7 @@ module GraphQL.Decode exposing
     , maybe, list
     , union, interface
     , Variant, variant
+    , toJsonDecoder
     )
 
 {-|
@@ -20,6 +21,9 @@ module GraphQL.Decode exposing
 When I first got started with JSON decoders, I had a hard time visualizing what was going on.
 For that reason, this module comes with a [`test`](#test) function to help you
 easily verify your code is behaving the way you expect.
+
+This is inspired by the `elm/json` package's [`decodeString`](https://package.elm-lang.org/packages/elm/json/latest/Json-Decode#decodeString)
+function, which is great for testing JSON decoders when you get stuck!
 
 @docs test
 
@@ -110,11 +114,16 @@ This will allow your Elm frontend to know which types came back:
 @docs union, interface
 @docs Variant, variant
 
+
+## **Internals**
+
+These functions are used internally by GraphQL.Http, and you won't need them in your projects.
+
+@docs toJsonDecoder
+
 -}
 
-import GraphQL.Internals.Decoder exposing (Decoder(..))
 import GraphQL.Scalar.Id exposing (Id)
-import GraphQL.Value exposing (Value)
 import Json.Decode
 
 
@@ -138,8 +147,16 @@ import Json.Decode
 This `Decoder` type represents a value that knows how to convert a raw JSON response into standard Elm values that can be used in your Elm application.
 
 -}
-type alias Decoder value =
-    GraphQL.Internals.Decoder.Decoder value
+type Decoder value
+    = Decoder
+        { decoder : Json.Decode.Decoder value
+        }
+
+
+{-| -}
+toJsonDecoder : Decoder value -> Json.Decode.Decoder value
+toJsonDecoder (Decoder { decoder }) =
+    decoder
 
 
 
@@ -655,11 +672,8 @@ variant options =
         )
 
 
-{-| The `elm/json` package comes with [`decodeString`](https://package.elm-lang.org/packages/elm/json/latest/Json-Decode#decodeString), which is great for testing
-JSON decoders when learning them for the first time, or using them with in an `elm-test` suite.
-
-This function is exposed so you can quickly check if your GraphQL `Decoder` works as you expect on
-a raw JSON string.
+{-| This function is exposed so you can quickly check if your GraphQL `Decoder` works as you expect
+with a raw JSON string.
 
     import GraphQL.Decode
 
@@ -678,5 +692,5 @@ test :
     -> Result Json.Decode.Error value
 test options =
     Json.Decode.decodeString
-        (GraphQL.Internals.Decoder.toJsonDecoder options.decoder)
+        (toJsonDecoder options.decoder)
         options.json

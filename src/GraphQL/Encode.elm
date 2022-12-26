@@ -5,6 +5,7 @@ module GraphQL.Encode exposing
     , enum
     , input
     , null
+    , toJson
     )
 
 {-|
@@ -28,10 +29,16 @@ module GraphQL.Encode exposing
 @docs input
 @docs null
 
+
+## **Internals**
+
+These functions are used internally by [`GraphQL.Http`](./GraphQL-Http), and you won't need them in your projects
+
+@docs toJson
+
 -}
 
 import GraphQL.Scalar.Id exposing (Id)
-import GraphQL.Value
 import Json.Encode
 
 
@@ -52,8 +59,20 @@ of what will be sent with your HTTP request:
 ```
 
 -}
-type alias Value =
-    GraphQL.Value.Value
+type Value
+    = Value Json.Encode.Value
+
+
+{-| -}
+fromJson : Json.Encode.Value -> Value
+fromJson json =
+    Value json
+
+
+{-| -}
+toJson : Value -> Json.Encode.Value
+toJson (Value json) =
+    json
 
 
 
@@ -73,7 +92,7 @@ string : String -> Value
 string value =
     value
         |> Json.Encode.string
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 {-| Create a GraphQL input from a `Float` value:
@@ -89,7 +108,7 @@ float : Float -> Value
 float value =
     value
         |> Json.Encode.float
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 {-| Create a GraphQL input from a `Int` value:
@@ -105,7 +124,7 @@ int : Int -> Value
 int value =
     value
         |> Json.Encode.int
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 {-| Create a GraphQL input from a `Bool` value:
@@ -121,7 +140,7 @@ bool : Bool -> Value
 bool value =
     value
         |> Json.Encode.bool
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 {-| Create a GraphQL input from a `Id` value:
@@ -143,7 +162,7 @@ id value =
     value
         |> GraphQL.Scalar.Id.toString
         |> Json.Encode.string
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 {-| Here's an example of using this function to work with a `DateTime` type. We recommend defining each custom scalar
@@ -187,7 +206,7 @@ scalar :
 scalar options =
     options.value
         |> options.toJson
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 
@@ -241,7 +260,7 @@ enum options =
     options.value
         |> options.toString
         |> Json.Encode.string
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 
@@ -271,12 +290,12 @@ input fields =
         toJsonField : ( String, Value ) -> ( String, Json.Encode.Value )
         toJsonField ( key, value ) =
             ( key
-            , GraphQL.Value.toJson value
+            , toJson value
             )
     in
     Json.Encode.object
         (List.map toJsonField fields)
-        |> GraphQL.Value.fromJson
+        |> Value
 
 
 {-| Send a `null` value to a GraphQL API. This is commonly used by mutations
@@ -298,4 +317,4 @@ to mark a field as removed.
 -}
 null : Value
 null =
-    GraphQL.Value.fromJson Json.Encode.null
+    Value Json.Encode.null
