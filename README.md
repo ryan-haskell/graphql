@@ -47,7 +47,7 @@ findHero heroId =
     GraphQL.Http.get
         { url = "/graphql"
         , query = """
-            query FindHero($id: Id!) {
+            query FindHero($id: ID!) {
               hero(id: $id) {
                 name
                 appearsIn
