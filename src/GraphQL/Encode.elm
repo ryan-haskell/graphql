@@ -4,7 +4,7 @@ module GraphQL.Encode exposing
     , scalar
     , enum
     , input
-    , null
+    , list, maybe, null
     , toJson
     )
 
@@ -27,7 +27,11 @@ module GraphQL.Encode exposing
 ## **Input types**
 
 @docs input
-@docs null
+
+
+## **Advanced**
+
+@docs list, maybe, null
 
 
 ## **Internals**
@@ -318,3 +322,48 @@ to mark a field as removed.
 null : Value
 null =
     Value Json.Encode.null
+
+
+{-| Create a `Maybe` value, using `null` if there is no value provided:
+
+    import GraphQL.Encode
+
+    encodeEmail : Maybe String -> GraphQL.Encode.Value
+    encodeEmail email =
+        GraphQL.Encode.maybe GraphQL.Encode.string email
+
+
+    encodeEmail Nothing == """ null """
+    encodeEmail (Just "ryan@elm.land") == """ "ryan@elm.land" """
+
+-}
+maybe : (a -> Value) -> Maybe a -> Value
+maybe toValue maybe_ =
+    case maybe_ of
+        Nothing ->
+            null
+
+        Just a ->
+            toValue a
+
+
+{-| Create a value from a list:
+
+    import GraphQL.Encode
+
+    encodeIds : List Int -> GraphQL.Encode.Value
+    encodeIds ids =
+        GraphQL.Encode.list GraphQL.Encode.int ids
+
+
+    encodeIds [] == """ [] """
+    encodeIds [1,2,3] == """ [1,2,3] """
+
+-}
+list : (a -> Value) -> List a -> Value
+list toValue list_ =
+    Value
+        (Json.Encode.list
+            (toValue >> (\(Value x) -> x))
+            list_
+        )

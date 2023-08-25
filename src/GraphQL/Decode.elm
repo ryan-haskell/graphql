@@ -8,6 +8,7 @@ module GraphQL.Decode exposing
     , maybe, list
     , union, interface
     , Variant, variant
+    , map
     , toJsonDecoder
     )
 
@@ -119,6 +120,7 @@ This will allow your Elm frontend to know which types came back:
 
 These functions are used internally by GraphQL.Http, and you won't need them in your projects.
 
+@docs map
 @docs toJsonDecoder
 
 -}
@@ -151,6 +153,13 @@ type Decoder value
     = Decoder
         { decoder : Json.Decode.Decoder value
         }
+
+
+{-| Map a decoder of one value to another.
+-}
+map : (a -> b) -> Decoder a -> Decoder b
+map fn (Decoder { decoder }) =
+    Decoder { decoder = Json.Decode.map fn decoder }
 
 
 {-| -}
