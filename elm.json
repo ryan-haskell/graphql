@@ -3,7 +3,7 @@
     "name": "ryannhg/graphql",
     "summary": "An elm/json inspired package for working with GraphQL",
     "license": "BSD-3-Clause",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "exposed-modules": [
         "GraphQL.Decode",
         "GraphQL.Encode",
