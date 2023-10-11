@@ -20,6 +20,8 @@ Here's a quick overview of what each module does:
 1. __`GraphQL.Encode`__ - Create JSON values to send as variables to a GraphQL API
 1. __`GraphQL.Http`__ - Send HTTP requests to a GraphQL API endpoint
 1. __`GraphQL.Scalar.ID`__ - Work with the built-in GraphQL `ID` scalar
+1. __`GraphQL.Operation`__ - Like `GraphQL.Http`, but allows you to handle `Cmd` values in one place
+1. __`GraphQL.Error`__ - Work with GraphQL validation errors
 
 ## __A quick example__
 
@@ -28,14 +30,13 @@ In [the official GraphQL documentation](https://graphql.org/learn/queries/), the
 This is an example that shows how to use this package to create an HTTP request for use in your Elm application:
 
 ```elm
-import Http
 import GraphQL.Decode exposing (Decoder)
 import GraphQL.Encode
 import GraphQL.Http
 
 
 type Msg
-    = ApiResponded (Result Http.Error Data)
+    = ApiResponded (Result GraphQL.Http.Error Data)
 
 
 
@@ -55,7 +56,7 @@ findHero heroId =
             }
           """
         , variables =
-            [ ( "id", GraphQL.Encode.id heroId )
+            [ ( "id", GraphQL.Encode.string heroId )
             ]
         , onResponse = ApiResponded
         , decoder = decoder
@@ -116,7 +117,7 @@ episodeDecoder =
 
 ### __Understanding how it works__
 
-When you send this HTTP request, using a function like [`GraphQL.Http.post`](https://package.elm-lang.org/packages/ryannhg/graphql/1.0.0/GraphQL-Http#post), the GraphQL API server will receive the following request:
+When you send this HTTP request, using a function like [`GraphQL.Http.post`](https://package.elm-lang.org/packages/ryannhg/graphql/latest/GraphQL-Http#post), the GraphQL API server will receive the following request:
 
 ```json
 // POST /graphql

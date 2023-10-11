@@ -2,6 +2,7 @@ module GraphQL.Operation exposing
     ( Operation, new
     , map
     , toHttpCmd
+    , toHttpCmdWithPartialErrors
     )
 
 {-| In GraphQL, an "operation" represents a query or mutation.
@@ -20,10 +21,16 @@ pass that context through for each page that uses GraphQL.
 @docs map
 @docs toHttpCmd
 
+
+## **Partial errors**
+
+@docs toHttpCmdWithPartialErrors
+
 -}
 
 import GraphQL.Decode
 import GraphQL.Encode
+import GraphQL.Error
 import GraphQL.Http
 import Http
 import Json.Decode
@@ -91,12 +98,12 @@ The `map` function allows us to eliminate that extra `data` type variable, so we
         = -- ...
         | SendGraphQL
             { operation : GraphQL.Operation.Operation msg
-            , onHttpError : Http.Error -> msg
+            , onError : GraphQL.Http.Error -> msg
             }
 
     sendGraphQL :
         { operation : Operation data
-        , onResponse : Result Http.Error data -> msg
+        , onResponse : Result GraphQL.Http.Error data -> msg
         }
         -> Effect msg
     sendGraphQL props =
@@ -109,7 +116,7 @@ The `map` function allows us to eliminate that extra `data` type variable, so we
         in
         SendGraphQL
             { operation = operation
-            , onHttpError = \httpError -> props.onResponse (Err httpError)
+            , onError = \httpError -> props.onResponse (Err httpError)
             }
 
 -}
@@ -135,7 +142,7 @@ GraphQL HTTP errors are reported automatically:
         = -- ...
         | SendGraphQL
             { operation : GraphQL.Operation.Operation msg
-            , onHttpError : Http.Error -> msg
+            , onError : GraphQL.Http.Error -> msg
             }
 
     toCmd :
@@ -150,7 +157,7 @@ GraphQL HTTP errors are reported automatically:
 
             -- ...
 
-            SendGraphQL { operation, onHttpError } ->
+            SendGraphQL { operation, onError } ->
                 GraphQL.Operation.toHttpCmd
                     { method = "POST"
                     , url = "https://api.github.com/graphql"
@@ -168,7 +175,7 @@ GraphQL HTTP errors are reported automatically:
 
                                 Err httpError ->
                                     options.batch
-                                        [ onHttpError httpError
+                                        [ onError httpError
                                         , Shared.Msg.ReportHttpError httpError
                                             |> options.fromSharedMsg
                                         ]
@@ -182,7 +189,7 @@ toHttpCmd :
     , timeout : Maybe Float
     , tracker : Maybe String
     , operation : Operation data
-    , onResponse : Result Http.Error data -> msg
+    , onResponse : Result GraphQL.Http.Error data -> msg
     }
     -> Cmd msg
 toHttpCmd options =
@@ -202,6 +209,61 @@ toHttpCmd options =
                 }
         , expect =
             GraphQL.Http.expect
+                options.onResponse
+                operation.decoder
+        , timeout = options.timeout
+        , tracker = options.tracker
+        }
+
+
+
+-- CMD
+
+
+{-| This is the same as `toHttpCmd`, but changes the type of `onResponse` to support [partial errors](./GraphQL-Error#-partial-errors-)
+with successful GraphQL responses.
+
+    type Effect msg
+        = -- ...
+        | SendGraphQL
+            { operation : GraphQL.Operation.Operation msg
+            , onError : Http.Error -> msg
+            }
+
+-}
+toHttpCmdWithPartialErrors :
+    { method : String
+    , url : String
+    , headers : List Http.Header
+    , timeout : Maybe Float
+    , tracker : Maybe String
+    , operation : Operation data
+    , onResponse :
+        Result
+            GraphQL.Http.Error
+            { data : data
+            , errors : List GraphQL.Error.Error
+            }
+        -> msg
+    }
+    -> Cmd msg
+toHttpCmdWithPartialErrors options =
+    let
+        (Operation operation) =
+            options.operation
+    in
+    Http.request
+        { method = options.method
+        , url = options.url
+        , headers = options.headers
+        , body =
+            GraphQL.Http.body
+                { operationName = Just operation.name
+                , query = operation.query
+                , variables = operation.variables
+                }
+        , expect =
+            GraphQL.Http.expectWithPartialErrors
                 options.onResponse
                 operation.decoder
         , timeout = options.timeout

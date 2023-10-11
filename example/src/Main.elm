@@ -7,7 +7,6 @@ import GraphQL.Http
 import GraphQL.Scalar.Id exposing (Id)
 import Html exposing (Html)
 import Html.Attributes exposing (alt, src, style)
-import Http
 
 
 main : Program () Model Msg
@@ -32,7 +31,7 @@ type alias Model =
 type Response value
     = Loading
     | Success value
-    | Failure Http.Error
+    | Failure GraphQL.Http.Error
 
 
 init : () -> ( Model, Cmd Msg )
@@ -69,7 +68,7 @@ fetchPokemon input =
 
 
 type Msg
-    = ApiResponded (Result Http.Error Data)
+    = ApiResponded (Result GraphQL.Http.Error Data)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -172,23 +171,29 @@ viewPokemon pokemon =
         ]
 
 
-fromErrorToString : Http.Error -> String
+fromErrorToString : GraphQL.Http.Error -> String
 fromErrorToString error =
     case error of
-        Http.BadBody reason ->
-            reason
+        GraphQL.Http.GraphQL { errors } ->
+            errors
+                |> List.map .message
+                |> String.join "\n"
 
-        Http.BadUrl _ ->
+        GraphQL.Http.BadUrl _ ->
             "Unexpected API URL"
 
-        Http.Timeout ->
+        GraphQL.Http.Timeout ->
             "API request timed out"
 
-        Http.NetworkError ->
+        GraphQL.Http.NetworkError ->
             "Couldn't connect to API"
 
-        Http.BadStatus statusCode ->
-            "API returned status code " ++ String.fromInt statusCode
+        GraphQL.Http.UnexpectedResponse { statusCode } ->
+            if statusCode >= 400 then
+                "Bad status code"
+
+            else
+                "Unexpected response from API"
 
 
 

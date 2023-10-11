@@ -1,6 +1,8 @@
 module GraphQL.Http exposing
     ( get, post
+    , Error(..)
     , body, expect
+    , expectWithPartialErrors
     )
 
 {-|
@@ -9,6 +11,11 @@ module GraphQL.Http exposing
 ## **Making HTTP requests**
 
 @docs get, post
+
+
+## **Errors**
+
+@docs Error
 
 
 ## **Advanced usage with `elm/http`**
@@ -49,10 +56,17 @@ Use these if you need to send HTTP headers, define request timeouts, etc.
 
 @docs body, expect
 
+
+## **Partial errors**
+
+@docs expectWithPartialErrors
+
 -}
 
+import Dict exposing (Dict)
 import GraphQL.Decode
 import GraphQL.Encode
+import GraphQL.Error
 import Http
 import Json.Decode
 import Json.Encode
@@ -83,7 +97,7 @@ get :
     , query : String
     , variables : List ( String, GraphQL.Encode.Value )
     , decoder : GraphQL.Decode.Decoder data
-    , onResponse : Result Http.Error data -> msg
+    , onResponse : Result Error data -> msg
     }
     -> Cmd msg
 get options =
@@ -128,7 +142,7 @@ post :
     , query : String
     , variables : List ( String, GraphQL.Encode.Value )
     , decoder : GraphQL.Decode.Decoder data
-    , onResponse : Result Http.Error data -> msg
+    , onResponse : Result Error data -> msg
     }
     -> Cmd msg
 post options =
@@ -202,6 +216,9 @@ body options =
 
 {-| Expect a JSON response from a GraphQL API.
 
+    type Msg
+        = ApiResponded Error Data
+
     fetchData : Cmd Msg
     fetchData =
         Http.request
@@ -214,15 +231,219 @@ body options =
 
 -}
 expect :
-    (Result Http.Error data -> msg)
+    (Result Error data -> msg)
     -> GraphQL.Decode.Decoder data
     -> Http.Expect msg
-expect onResponse decoder =
-    Http.expectJson
-        onResponse
-        (Json.Decode.field "data"
-            (GraphQL.Decode.toJsonDecoder decoder)
+expect toMsg decoder =
+    Http.expectStringResponse
+        toMsg
+        (fromHttpResponse
+            (Json.Decode.field "data" (GraphQL.Decode.toJsonDecoder decoder))
         )
+
+
+{-| According to the [GraphQL specification](https://spec.graphql.org/June2018/#example-08b62), it's possible to
+receive GraphQL errors alongside a valid data response:
+
+```json
+{
+  "errors": [
+    {
+      "message": "Name for character with ID 1002 could not be fetched.",
+      "locations": [ { "line": 6, "column": 7 } ],
+      "path": [ "hero", "heroFriends", 1, "name" ]
+    }
+  ],
+  "data": {
+    "hero": {
+      "name": "R2-D2",
+      "heroFriends": [
+        {
+          "id": "1000",
+          "name": "Luke Skywalker"
+        },
+        null,
+        {
+          "id": "1003",
+          "name": "Leia Organa"
+        }
+      ]
+    }
+  }
+}
+```
+
+If your application needs to access those partial error responses,
+use this rather than the simpler `expect` function:
+
+    type Msg
+        = ApiResponded
+            (Result GraphQL.Http.Error
+                { data : Data
+                , errors : List GraphQL.Error.Error
+                }
+            )
+
+    fetchData : Cmd Msg
+    fetchData =
+        Http.request
+            { -- ... other fields
+            , expect =
+                GraphQL.Http.expectWithPartialErrors
+                    ApiResponded
+                    decoder
+            }
+
+-}
+expectWithPartialErrors :
+    (Result
+        Error
+        { data : data
+        , errors : List GraphQL.Error.Error
+        }
+     -> msg
+    )
+    -> GraphQL.Decode.Decoder data
+    -> Http.Expect msg
+expectWithPartialErrors toMsg decoder =
+    Http.expectStringResponse toMsg
+        (fromHttpResponse
+            (Json.Decode.map2 PartialErrors
+                (Json.Decode.field "data" (GraphQL.Decode.toJsonDecoder decoder))
+                (Json.Decode.oneOf
+                    [ errorsDecoder
+                    , Json.Decode.succeed []
+                    ]
+                )
+            )
+        )
+
+
+type alias PartialErrors data =
+    { data : data
+    , errors : List GraphQL.Error.Error
+    }
+
+
+
+-- ERRORS
+
+
+{-| When something goes wrong with the GraphQL request, this error type
+will be returned with your `Result`.
+
+This extends the default `Http.Error` to include more context and
+GraphQL specific errors returned from the API.
+
+-}
+type Error
+    = BadUrl String
+    | Timeout
+    | NetworkError
+    | GraphQL { errors : List GraphQL.Error.Error }
+    | UnexpectedResponse
+        { url : String
+        , statusCode : Int
+        , statusText : String
+        , headers : Dict String String
+        , body : String
+        , jsonError : Maybe Json.Decode.Error
+        }
+
+
+fromHttpResponse :
+    Json.Decode.Decoder value
+    -> Http.Response String
+    -> Result Error value
+fromHttpResponse decoder response =
+    let
+        handleUnexpectedResponse : Http.Metadata -> String -> Result Error value
+        handleUnexpectedResponse metadata body_ =
+            let
+                toUnexpected : Maybe Json.Decode.Error -> Error
+                toUnexpected maybeJsonError =
+                    UnexpectedResponse
+                        { url = metadata.url
+                        , statusCode = metadata.statusCode
+                        , statusText = metadata.statusText
+                        , headers = metadata.headers
+                        , body = body_
+                        , jsonError = maybeJsonError
+                        }
+            in
+            case Json.Decode.decodeString decoder body_ of
+                Ok data ->
+                    -- If we get valid data, but a bad status code, we still fail
+                    Err (toUnexpected Nothing)
+
+                Err jsonDecodeError ->
+                    case
+                        Json.Decode.decodeString
+                            errorsDecoder
+                            body_
+                    of
+                        Ok errors ->
+                            Err (GraphQL { errors = errors })
+
+                        Err _ ->
+                            Err (toUnexpected (Just jsonDecodeError))
+    in
+    case response of
+        Http.BadUrl_ url ->
+            Err (BadUrl url)
+
+        Http.Timeout_ ->
+            Err Timeout
+
+        Http.NetworkError_ ->
+            Err NetworkError
+
+        Http.BadStatus_ metadata body_ ->
+            handleUnexpectedResponse metadata body_
+
+        Http.GoodStatus_ metadata body_ ->
+            handleUnexpectedResponse metadata body_
+
+
+errorsDecoder : Json.Decode.Decoder (List GraphQL.Error.Error)
+errorsDecoder =
+    Json.Decode.field "errors" (Json.Decode.list errorDecoder)
+
+
+errorDecoder : Json.Decode.Decoder GraphQL.Error.Error
+errorDecoder =
+    Json.Decode.map4 GraphQL.Error.Error
+        (Json.Decode.field "message" Json.Decode.string)
+        (Json.Decode.oneOf
+            [ Json.Decode.field "locations" (Json.Decode.list locationDecoder)
+            , Json.Decode.succeed []
+            ]
+        )
+        (Json.Decode.oneOf
+            [ Json.Decode.field "path" (Json.Decode.list pathSegmentDecoder)
+            , Json.Decode.succeed []
+            ]
+        )
+        (Json.Decode.oneOf
+            [ Json.Decode.field "extensions" (Json.Decode.dict Json.Decode.value)
+            , Json.Decode.succeed Dict.empty
+            ]
+        )
+
+
+locationDecoder : Json.Decode.Decoder GraphQL.Error.Location
+locationDecoder =
+    Json.Decode.map2 GraphQL.Error.Location
+        (Json.Decode.field "line" Json.Decode.int)
+        (Json.Decode.field "column" Json.Decode.int)
+
+
+pathSegmentDecoder : Json.Decode.Decoder GraphQL.Error.PathSegment
+pathSegmentDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map GraphQL.Error.Index Json.Decode.int
+        , Json.Decode.map GraphQL.Error.Field Json.Decode.string
+        ]
 
 
 

@@ -248,7 +248,7 @@ mixing up `String` and `Id` values.
         { decoder = GraphQL.Decode.id
         , json = """ "abc" """
         }
-        == Ok (GraphQL.Scalar.Id.Id "abc")
+        == Ok (Id "abc")
 
     -- Works with JSON numbers
     test

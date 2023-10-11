@@ -3,13 +3,14 @@
     "name": "ryannhg/graphql",
     "summary": "An elm/json inspired package for working with GraphQL",
     "license": "BSD-3-Clause",
-    "version": "1.1.0",
+    "version": "2.0.0",
     "exposed-modules": [
         "GraphQL.Decode",
         "GraphQL.Encode",
         "GraphQL.Http",
-        "GraphQL.Scalar.Id",
-        "GraphQL.Operation"
+        "GraphQL.Error",
+        "GraphQL.Operation",
+        "GraphQL.Scalar.Id"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
