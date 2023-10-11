@@ -8,7 +8,7 @@ module GraphQL.Http exposing
 {-|
 
 
-## **Making HTTP requests**
+## **HTTP requests**
 
 @docs get, post
 
@@ -217,7 +217,7 @@ body options =
 {-| Expect a JSON response from a GraphQL API.
 
     type Msg
-        = ApiResponded Error Data
+        = ApiResponded (Result GraphQL.Http.Error Data)
 
     fetchData : Cmd Msg
     fetchData =
