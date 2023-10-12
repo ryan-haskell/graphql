@@ -373,8 +373,12 @@ fromHttpResponse decoder response =
             in
             case Json.Decode.decodeString decoder body_ of
                 Ok data ->
-                    -- If we get valid data, but a bad status code, we still fail
-                    Err (toUnexpected Nothing)
+                    if metadata.statusCode >= 400 then
+                        -- If we get valid data, but a bad status code, we still fail
+                        Err (toUnexpected Nothing)
+
+                    else
+                        Ok data
 
                 Err jsonDecodeError ->
                     case

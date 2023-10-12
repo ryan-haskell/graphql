@@ -47,7 +47,7 @@ fetchPokemon input =
         { url = "https://beta.pokeapi.co/graphql/v1beta"
         , query = """
             query FetchPokemon($limit: Int!) {
-              pokemon_v2_pokemon(limit: $limit) {
+              pokemon: pokemon_v2_pokemon(limit: $limit) {
                 name
                 id
               }
@@ -98,7 +98,7 @@ decoder : GraphQL.Decode.Decoder Data
 decoder =
     GraphQL.Decode.object Data
         |> GraphQL.Decode.field
-            { name = "pokemon_v2_pokemon"
+            { name = "pokemon"
             , decoder = GraphQL.Decode.list pokemonDecoder
             }
 
