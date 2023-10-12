@@ -9,8 +9,7 @@
         "GraphQL.Encode",
         "GraphQL.Http",
         "GraphQL.Error",
-        "GraphQL.Operation",
-        "GraphQL.Scalar.Id"
+        "GraphQL.Operation"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
