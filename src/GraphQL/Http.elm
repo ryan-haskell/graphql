@@ -357,8 +357,12 @@ fromHttpResponse :
     -> Result Error value
 fromHttpResponse decoder response =
     let
-        handleUnexpectedResponse : Http.Metadata -> String -> Result Error value
-        handleUnexpectedResponse metadata body_ =
+        handleUnexpectedResponse :
+            Bool
+            -> Http.Metadata
+            -> String
+            -> Result Error value
+        handleUnexpectedResponse isGoodStatusCode metadata body_ =
             let
                 toUnexpected : Maybe Json.Decode.Error -> Error
                 toUnexpected maybeJsonError =
@@ -373,12 +377,12 @@ fromHttpResponse decoder response =
             in
             case Json.Decode.decodeString decoder body_ of
                 Ok data ->
-                    if metadata.statusCode >= 400 then
-                        -- If we get valid data, but a bad status code, we still fail
-                        Err (toUnexpected Nothing)
+                    if isGoodStatusCode then
+                        Ok data
 
                     else
-                        Ok data
+                        -- If we get valid data, but a bad status code, we still fail
+                        Err (toUnexpected Nothing)
 
                 Err jsonDecodeError ->
                     case
@@ -403,10 +407,10 @@ fromHttpResponse decoder response =
             Err NetworkError
 
         Http.BadStatus_ metadata body_ ->
-            handleUnexpectedResponse metadata body_
+            handleUnexpectedResponse False metadata body_
 
         Http.GoodStatus_ metadata body_ ->
-            handleUnexpectedResponse metadata body_
+            handleUnexpectedResponse True metadata body_
 
 
 errorsDecoder : Json.Decode.Decoder (List GraphQL.Error.Error)
