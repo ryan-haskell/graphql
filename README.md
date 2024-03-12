@@ -1,11 +1,11 @@
-# __@ryannhg/graphql__
+# __@ryan-haskell/graphql__
 
 An `elm/json` inspired package for working with GraphQL
 
 ## __Installation__
 
 ```
-elm install ryannhg/graphql
+elm install ryan-haskell/graphql
 ```
 
 ## __Introduction__
@@ -117,7 +117,7 @@ episodeDecoder =
 
 ### __Understanding how it works__
 
-When you send this HTTP request, using a function like [`GraphQL.Http.post`](https://package.elm-lang.org/packages/ryannhg/graphql/latest/GraphQL-Http#post), the GraphQL API server will receive the following request:
+When you send this HTTP request, using a function like [`GraphQL.Http.post`](https://package.elm-lang.org/packages/ryan-haskell/graphql/latest/GraphQL-Http#post), the GraphQL API server will receive the following request:
 
 ```json
 // POST /graphql
